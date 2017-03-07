@@ -1,0 +1,124 @@
+---
+title: "Peer Assessment 1 for Reproducible Research"
+author: "Spencer Green"
+date: "March 5, 2017"
+output: html_document
+---
+
+Removes any variables in the environment from previous work.
+
+```{r setup}
+rm(list=ls()) 
+```
+
+Loading and Preprocessing the data.
+===================================
+
+We can also do some simple exploratory analysis of what type of data is contained in activity.csv.
+
+```{r echo=TRUE}
+dat <- read.csv('activity.csv', header = TRUE)
+names(dat)
+head(dat)
+dim(dat)
+str(dat)
+```
+
+We can subset the data by day to make later calculations easier. We'll remove missing values at this time.
+
+```{r echo=TRUE}
+dat_steps <- aggregate(steps~date,data = dat, FUN = sum, na.rm=TRUE)
+```
+
+Mean and Median steps per day.
+================================
+
+```{r echo=TRUE}
+mean_steps <- mean(dat_steps$steps)
+med_steps <- median(dat_steps$steps)
+```
+
+The Mean is `r mean_steps` and the Median is `r med_steps`
+
+Now the histogram itself.
+  
+```{r echo=TRUE}
+hist(dat_steps$steps, main="Total Steps per Day", xlab = "Steps Taken in a day", breaks = 20)
+```
+
+
+Time series plot of average steps a day.
+========================================
+
+```{r echo=TRUE}
+interval_steps <- aggregate(steps~interval, data = dat, FUN = mean, na.rm = TRUE)
+plot(steps~interval, data = interval_steps, type = "l")
+```
+
+Which 5-minute interval that, on average, contains the maximum number of steps.
+===============================================================================
+
+```{r}
+interval_steps[which.max(interval_steps$steps),]$interval
+```
+
+The most steps is the **`r interval_steps[which.max(interval_steps$steps),]$interval`th** interval.
+
+Describe and show strategy for imputing NAs.
+============================================
+
+```{r echo=TRUE}
+sum(is.na(dat$steps))
+```
+
+The total rows missing are **`r sum(is.na(dat$steps))`**  
+
+Create a new dataset that is equal to the original dataset but with the missing data filled in.  
+
+Strategy: Use the mean of the 5-minute interval.  
+
+First I made a function missed_steps to get the mean steps for particular 5-minute interval. 
+
+```{r echo=TRUE}
+missed_steps<-function(interval){
+    stepsInterval[stepsInterval$interval==interval,]$steps
+}
+```
+
+Create the new dataset
+
+```{r echo=TRUE}
+complete_steps <- merge(dat, dat_steps, by = "date", suffixes = c("", ".mean"))
+nas <- is.na(complete_steps$steps)
+complete_steps$steps[nas] <- complete_steps$mean[nas]
+complete_steps <- complete_steps[, c(1:3)]
+head(complete_steps)
+```
+
+Histogram of the total steps taken each day:
+
+```{r echo=TRUE}
+dat_steps <- aggregate(steps ~ date, complete_steps, sum)
+barplot(dat_steps$steps, names.arg = dat_steps$date, ylim = c(0,25000),xlab = "date",ylab = "sum(steps)",)
+```
+
+Are There Differences between Weekdays and Weekends in Activity?
+================================================================
+
+First, we need to differentiate weekend days and weekdays  
+
+```{r echo=TRUE}
+complete_steps$day=ifelse(as.POSIXlt(as.Date(complete_steps$date))$wday%%6==0,"weekend","weekday")
+complete_steps$day=factor(complete_steps$day,levels = c("weekday","weekend"))
+head(complete_steps)
+```
+
+Make a panel plot containing a time series plot (i.e. type = “l”) of the 5-minute interval (x-axis) and the average number of steps taken
+
+```{r echo=TRUE}
+steps_interval <- aggregate(steps~interval+day,complete_steps,mean)
+library(lattice)
+xyplot(steps~interval | factor(day), data=steps_interval, aspects=1/2, type="l")
+```
+
+As we can see, there's generally more activity over weekends, but weekdays have a larger morning spike.
